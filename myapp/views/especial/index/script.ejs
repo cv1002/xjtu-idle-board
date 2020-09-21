@@ -1,0 +1,306 @@
+<script>
+  /* 监听脚本 */
+
+  // 根据价格区间筛选商品
+  $("#setRangeBtn").click(() => {
+
+    // 获取价格区间
+    let priceMin = parseInt($("#priceMinInput").val());
+    let priceMax = parseInt($("#priceMaxInput").val());
+
+    // 验证数据
+    if (isNaN(priceMin)) priceMin = 0;
+    if (isNaN(priceMax)) priceMax = 999999;
+
+    if (
+      !(typeof priceMin == "number" && priceMin >= 0) ||
+      !(typeof priceMax == "number" && priceMax >= 0) ||
+      !(priceMin <= priceMax)
+    ) {
+      alert("非法数据, 请检查数据合理性");
+      return;
+    } else {
+      // 检验有效, 赋值
+      min = priceMin;
+      max = priceMax;
+      loadStart = 0;
+      loadedCard = 0;
+      loadCard();
+    }
+
+  })
+
+
+  $(window).scroll(function () {
+    // 滚轮监听
+
+    var scrollPosition = $(this).scrollTop();
+    var itemNavHeight = $("#itemNav").height();
+    // 根据两个位置大小关系, 确定导航栏的显示方式
+
+    // 如果itemNav没有置顶
+    if (!$("#itemNav").hasClass("fixed-top")) {
+      var itemNavHeight = $("#itemNav").height();
+      var itemNavOffset = $("#itemNav").offset().top;
+      if (scrollPosition >= itemNavOffset - 10) {
+        $("#topNav").css("display", "none");
+        $("#itemNav").addClass("fixed-top");
+        $("#itemNavPositioner").height(itemNavHeight);
+      }
+    } else {
+      // 如果itemNav置顶
+      var itemNavHeight = $("#itemNavPositioner").height();
+      var itemNavOffset = $("#itemNavPositioner").offset().top;
+      if (scrollPosition <= itemNavOffset - 10) {
+        $("#topNav").css("display", "");
+        $("#itemNav").removeClass("fixed-top");
+        $("#itemNavPositioner").height('0');
+      }
+    }
+
+    // 动态加载
+    var documentHeight = $(document).height();
+    var windowHeight = $(window).innerHeight();
+    // console.log('documentHeight', documentHeight, 'scrollPosition + windowHeight', scrollPosition ,  windowHeight)
+    if (scrollPosition + windowHeight * 1.1 >= documentHeight && loadStart <= loadedCard && cardReturned) {
+      loadCard();
+      cardReturned = false;
+    }
+
+  });
+
+  // 搜索事件
+  $("#topSearch").keydown(function () {
+    if (event.which == 13) {
+      search = $("#topSearch").val();
+      if (search == "") search = "null";
+      loadedCard = 0;
+      loadStart = 0;
+      console.log('loadedCard', loadedCard, 'loadStart', loadedCard)
+      loadCard();
+    }
+  });
+
+  // 显示下架开关点击事件
+  $("#showItemOffShelf").click(function () {
+    if (!$("#showItemOffShelf").hasClass("active")) {
+      $(".offShelf").css("display", "");
+
+      $("#showItemOffShelfIcon").removeClass("fa-toggle-off")
+      $("#showItemOffShelfIcon").addClass("fa-toggle-on")
+      $("#showItemOffShelf").addClass("active")
+      // $(".offShelf").css("width", "33%");
+      $container.masonry();
+    } else {
+      $(".offShelf").css("display", "none");
+      $("#showItemOffShelfIcon").removeClass("fa-toggle-on")
+      $("#showItemOffShelfIcon").addClass("fa-toggle-off")
+      $("#showItemOffShelf").removeClass("active")
+      // $(".offShelf").css("width", "0");
+      $container.masonry();
+
+
+      // $container.masonry({
+      //   itemSelector: '.box',
+      //   gutter: 20,
+      //   isAnimated: true,
+      // });
+    }
+
+  })
+</script>
+
+<script>
+  /* 初始化脚本 */
+
+  // 全局变量声明
+  var search = "null";
+  var sort = "date_down";
+  var min = "0";
+  var max = "999999";
+  var loadedCard = 0;
+  var loadStart = 0;
+  var cardReturned = false;
+  const loadLimit = 5;
+  var $container;
+
+  // 全局声明式函数
+  function updateNav() {
+    console.log("updateNav", search, sort, min, max)
+    // 顶部搜索栏部分
+    if (search == "null") $("#topSearch").value = "";
+    else $("#topSearch").val(search);
+
+    // 排序部分
+    let activeID = "";
+    let priceSortInner = "价格";
+    let priceSortLinkChioce = "price_up";
+    let hrefFwd = `search=${search}-sort=`;
+    let hrefEnd = `-min=${min}-max=${max}-start=${0}-limit=${loadLimit}`;
+    switch (sort) {
+      case "price_up":
+        activeID = "priceSort";
+        priceSortInner = "价格↑";
+        priceSortLinkChioce = "price_down";
+        break;
+      case "price_down":
+        activeID = "priceSort";
+        priceSortInner = "价格↓";
+        priceSortLinkChioce = "price_up";
+        break;
+      case "date_down":
+        activeID = "newestSort";
+        priceSortInner = "价格";
+        priceSortLinkChioce = "price_up";
+        break;
+      case "null":
+        activeID = "newestSort";
+        break;
+      default:
+        break;
+    }
+    // 改变内容
+    $("#priceSortLink").html(priceSortInner);
+
+    // 改变链接
+    $("#newestSortLink").attr(
+      "onclick",
+      `itemNavLink("${hrefFwd}date_down${hrefEnd}", 'date_down')`
+    );
+
+    $("#priceSortLink").attr(
+      "onclick",
+      `itemNavLink("${hrefFwd}${priceSortLinkChioce}${hrefEnd}", "${priceSortLinkChioce}")`
+    );
+
+    // 移除所有 active
+    $("#newestSort").removeClass("active");
+    $("#priceSort").removeClass("active");
+    $("#showItemOffShelf").removeClass("active");
+    $("#showItemOffShelfIcon").removeClass("fa-toggle-on")
+    $("#showItemOffShelfIcon").addClass("fa-toggle-off")
+    // 添加当前 active
+    $("#" + activeID).addClass("active");
+
+    // 价格区间部分
+    if (!(parseInt(min) == 0 && parseInt(max) == 999999)) {
+      $("#priceMinInput").val(min);
+      $("#priceMaxInput").val(max);
+    } else {
+      $("#priceMinInput").val("");
+      $("#priceMaxInput").val("");
+    }
+
+
+  }
+
+
+
+  function getAjaxUrl() {
+    return `/search=${search}-sort=${sort}-min=${min}-max=${max}-start=${loadStart}-limit=${loadLimit}`;
+  };
+
+  function loadCardAjax(url) {
+    $.ajax({
+      type: "GET",
+      url: url,
+      success: function (resJson) {
+        if (resJson.toString().startsWith('ERROR')) {
+          alert("获取商品卡片失败")
+          console.log(resJson);
+          return;
+        } else {
+
+
+          if (loadStart == 0) {
+            // 如果是第一次加载, 重新加载cardArea
+            $("#cardAreas").html("")
+            // 如果是第一次加载, 初始化masonry
+            $container = $("#cardAreas").masonry({
+              itemSelector: '.box',
+              columnWidth: 10,
+              gutter: 30
+            });
+          }
+
+
+          var $content = $(resJson.cardSet.toString())
+          $container.append($content)
+          // alert("stop")
+          var imgWidth = $(".cardImgArea").width();
+          $(".cardImgArea").each((index, element) => {
+            var imgHeight = imgWidth/$(element).attr("data-aspect-ratio")
+            $(element).height(imgHeight);
+            console.log(imgHeight);
+            // $(this).height($(this).width() / parseInt($(this).attr("data-aspect-ratio")))
+          })
+          // alert("stop")
+          
+          // $("#cardAreas").imagesLoaded(function() { 
+          $container.masonry('appended', $content)
+          if (!$("#showItemOffShelf").hasClass("active")) {
+            $(".offShelf").css("display", "none");
+          }
+          
+          $container.masonry();
+          $(".newbox").removeClass('newbox')
+          // })
+
+          cardReturned = true
+          loadedCard += resJson.cardNum;
+          loadStart += loadLimit;
+
+        }
+      },
+    });
+  };
+
+  function itemNavLink(href, choice) {
+    console.log("itemNavLink", href)
+    switch (choice) {
+      case 'date_down': sort = 'date_down'; break;
+      case 'price_up': sort = 'price_up'; break;
+      case 'price_down': sort = 'price_down'; break;
+    }
+    loadStart = 0;
+    loadedCard = 0;
+    loadCardAjax(href);
+    updateNav();
+  }
+
+  // 根据全局变量中存储的状态进行 卡片重(初)加载
+  function loadCard() {
+    loadCardAjax(getAjaxUrl());
+  };
+
+
+  // 加载后执行
+  $(function () {
+
+    loadCard();
+    updateNav();
+    // 显示顶部搜索栏
+    $("#topSearch").css("display", "")
+
+  });
+</script>
+
+<script>
+  /* 插件脚本 */
+
+
+
+  // 初始化clipboard插件
+  var clipboard = new ClipboardJS("#copyWechatID", {
+    // 这里必须用原生JS!!
+    // 这是一个坑, 如果在Bootstrap的Modal中使用clipboard.js, 会因为焦点问题而失效
+    // 下面这行就是解决方法
+    container: document.getElementById("itemModal"),
+  });
+
+  clipboard.on("error", function (e) {
+    console.log("ERROR: CLIP_FAILED_ERROR (Script: index/script)");
+    console.error("Action:", e.action);
+    console.error("Trigger:", e.trigger);
+  });
+</script>

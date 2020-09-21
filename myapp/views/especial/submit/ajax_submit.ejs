@@ -1,0 +1,87 @@
+<script>
+    
+
+    $(function(){
+        //用于将表单数据转化为JSON的函数
+        $.fn.serializeObject = function(){
+            var o = {};
+            var a = this.serializeArray();
+            $.each(a, function() {
+                if (o[this.name] !== undefined) {
+                    if (!o[this.name].push) {
+                        o[this.name] = [o[this.name]];
+                    }
+                    o[this.name].push(this.value || '');
+                } else {
+                    o[this.name] = this.value || '';
+                }
+            });
+            return o;
+        };
+
+
+        $("#btn_submit").click(function(){
+            //清空表单验证状态
+            $("input").removeClass("is-invalid");
+            
+
+            // 验证token
+            var token = window.localStorage.getItem('xjtu-idle-token'); 
+            console.log("Processing Ajax getUserName...");
+            $.ajax({
+                type: 'GET',
+                url: '/getUserName',
+                headers:{'Authorization': `Bearer ${token}`},
+                success: function(userName){
+                    if(userName != 'ERROR'){
+
+                        //验证表单输入
+                        // 商品名称
+                        if($("#itemName").val().length > 36 || $("#itemName").val() == "" ) $("#itemName").addClass("is-invalid");
+                        // 商品价格
+                        var price = $("#itemPrice").val()
+                        var re = /^[0-9]/
+                        if(!re.test(price) || parseInt(price) < 0) $("#itemPrice").addClass("is-invalid");
+                        // 商品简介
+                        if($("#itemDescription").val().length > 200 || $("#itemDescription").val() == "") $("#itemDescription").addClass("is-invalid");
+                        // 新旧程度描述
+                        if($("#itemOldNewRate").val().length > 200) $("#itemOldNewRate").addClass("is-invalid");
+                        // 封面
+                        if($("#coverFileName").val() == '') $("#coverFileName").addClass("is-invalid");
+                        // 备注
+                        if($("#remarks").val().length > 200) $("#remarks").addClass("is-invalid")
+
+
+                        if($("input").hasClass("is-invalid")) {
+                            console.log("Error in input. (from ajax_submit.ejs)")
+                            return;
+                        }
+                        
+                        console.log("Processing Ajax Submit...");
+                        token = window.localStorage.getItem('xjtu-idle-token')
+                        submitData = $("form").serializeObject();
+                        submitData['userName'] = userName;
+                        $.ajax({
+                            type: 'POST',
+                            url: '/submit',
+                            data: {formData: JSON.stringify(submitData)},
+                            headers: { 'Authorization': `Bearer ${token}`},
+                            success: function(res){
+                                console.log("Submit Success! (from: Page)");
+                                console.log(res);
+                                window.location.href = '/';
+                            },
+                            error: function(res){
+                                console.error(res);
+                            }
+                        })
+                    }else{
+                        alert('在提交之前请先登录~')
+                        window.open("/login")
+                    }
+                }
+            })            
+        })
+    })
+</script>
+
